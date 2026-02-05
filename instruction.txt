@@ -1,0 +1,9 @@
+Запуск:
+.venv\Scripts\activate
+python videoDownload.py
+
+Установка:
+  python -m venv .venv
+  pip install -r requirements.txt
+  Powershell: 
+   winget install --id yt-dlp.FFmpeg -e

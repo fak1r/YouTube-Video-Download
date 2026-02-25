@@ -10,6 +10,7 @@ except ImportError:
     sys.exit(1)
 
 VIDEO_DIR = Path(__file__).resolve().parent / "video"
+AUDIO_DIR = Path(__file__).resolve().parent / "audio"
 
 
 def resolve_ffmpeg():
@@ -71,6 +72,16 @@ def normalize_url(url: str):
     if not url.startswith(("http://", "https://")):
         return None
     return url
+
+
+def choose_mode() -> str:
+    mode = input("Download mode: video or audio? [v/a, default v]: ").strip().lower()
+    if mode in ("", "v", "video"):
+        return "video"
+    if mode in ("a", "audio"):
+        return "audio"
+    print("Invalid mode. Using video mode.")
+    return "video"
 
 
 def get_info(url: str) -> dict:
@@ -136,12 +147,40 @@ def progress_hook(d: dict) -> None:
             print("Download finished.")
 
 
-def download(url: str) -> None:
+def download(url: str, mode: str) -> None:
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    ffmpeg_path = resolve_ffmpeg()
+
+    if mode == "audio":
+        ydl_opts = {
+            "outtmpl": str(AUDIO_DIR / "%(title).200s.%(ext)s"),
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "progress_hooks": [progress_hook],
+        }
+        if ffmpeg_path:
+            ydl_opts["ffmpeg_location"] = ffmpeg_path
+            ydl_opts["postprocessors"] = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ]
+            print(f"Using ffmpeg: {ffmpeg_path}")
+            print("Mode: audio only (mp3).")
+        else:
+            print("ffmpeg not found in PATH or common locations.")
+            print("Mode: audio only (original format without conversion).")
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([url])
+        return
+
     info = get_info(url)
     heights = available_heights(info)
     format_selector = choose_format(heights)
-
     ydl_opts = {
         "outtmpl": str(VIDEO_DIR / "%(title).200s.%(ext)s"),
         "format": format_selector,
@@ -149,7 +188,6 @@ def download(url: str) -> None:
         "noplaylist": True,
         "progress_hooks": [progress_hook],
     }
-    ffmpeg_path = resolve_ffmpeg()
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
         print(f"Using ffmpeg: {ffmpeg_path}")
@@ -161,6 +199,8 @@ def download(url: str) -> None:
 
 
 def main() -> int:
+    mode = choose_mode()
+
     try:
         url = input("Paste YouTube URL: ").strip()
     except KeyboardInterrupt:
@@ -173,7 +213,7 @@ def main() -> int:
         return 1
 
     try:
-        download(url)
+        download(url, mode)
     except yt_dlp.utils.DownloadError as exc:
         msg = str(exc)
         print(f"Download failed: {msg}")

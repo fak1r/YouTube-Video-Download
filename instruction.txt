@@ -1,6 +1,6 @@
-Запуск:
+﻿Запуск:
 .venv\Scripts\activate
-python videoDownload.py
+python youtube_downloader.py
 
 Установка:
   python -m venv .venv

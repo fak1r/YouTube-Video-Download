@@ -1,6 +1,7 @@
 ﻿Запуск:
 .venv\Scripts\activate
 python youtube_downloader.py
+python video_to_mp3.py
 
 Установка:
   python -m venv .venv

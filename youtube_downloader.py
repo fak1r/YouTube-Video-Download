@@ -1,6 +1,4 @@
 ﻿from pathlib import Path
-import os
-import shutil
 import sys
 
 try:
@@ -9,60 +7,10 @@ except ImportError:
     print("Missing dependency: yt-dlp. Install with: pip install -r requirements.txt")
     sys.exit(1)
 
+from ffmpeg_utils import resolve_ffmpeg
+
 VIDEO_DIR = Path(__file__).resolve().parent / "video"
 AUDIO_DIR = Path(__file__).resolve().parent / "audio"
-
-
-def resolve_ffmpeg():
-    env_path = os.environ.get("FFMPEG_PATH")
-    if env_path:
-        p = Path(env_path)
-        if p.is_dir():
-            candidate = p / "ffmpeg.exe"
-            if candidate.exists():
-                return str(candidate)
-        if p.exists():
-            return str(p)
-
-    env_home = os.environ.get("FFMPEG_HOME")
-    if env_home:
-        p = Path(env_home) / "bin" / "ffmpeg.exe"
-        if p.exists():
-            return str(p)
-
-    found = shutil.which("ffmpeg")
-    if found:
-        return found
-
-    localappdata = os.environ.get("LOCALAPPDATA")
-    if localappdata:
-        link = Path(localappdata) / "Microsoft" / "WinGet" / "Links" / "ffmpeg.exe"
-        if link.exists():
-            return str(link)
-
-        packages = Path(localappdata) / "Microsoft" / "WinGet" / "Packages"
-        if packages.exists():
-            prefixes = (
-                "yt-dlp.FFmpeg",
-                "Gyan.FFmpeg",
-                "BtbN.FFmpeg",
-                "Jellyfin.FFmpeg",
-            )
-            for pkg in packages.iterdir():
-                if not pkg.is_dir() or not pkg.name.startswith(prefixes):
-                    continue
-                for candidate in pkg.rglob("ffmpeg.exe"):
-                    return str(candidate)
-
-    for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)")):
-        if not base:
-            continue
-        for name in ("FFmpeg", "ffmpeg"):
-            candidate = Path(base) / name / "bin" / "ffmpeg.exe"
-            if candidate.exists():
-                return str(candidate)
-
-    return None
 
 
 def normalize_url(url: str):

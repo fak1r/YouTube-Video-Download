@@ -11,6 +11,18 @@ from ffmpeg_utils import resolve_ffmpeg
 
 VIDEO_DIR = Path(__file__).resolve().parent / "video"
 AUDIO_DIR = Path(__file__).resolve().parent / "audio"
+SUPPORTED_COOKIE_BROWSERS = {
+    "brave": "brave",
+    "chrome": "chrome",
+    "chromium": "chromium",
+    "edge": "edge",
+    "firefox": "firefox",
+    "opera": "opera",
+    "vivaldi": "vivaldi",
+}
+BASE_YDL_OPTS = {
+    "js_runtimes": {"node": {}},
+}
 
 
 def normalize_url(url: str):
@@ -32,13 +44,37 @@ def choose_mode() -> str:
     return "video"
 
 
-def get_info(url: str) -> dict:
-    ydl_opts = {
+def choose_cookie_options() -> dict:
+    print("Cookie source for YouTube sign-in/bot checks:")
+    print("  Press Enter for none, or enter a browser name: chrome, edge, firefox, brave.")
+    print("  You can also paste a cookies.txt path exported from your browser.")
+    choice = input("Cookies [default none]: ").strip().strip("'\"")
+    if not choice:
+        return {}
+
+    lower_choice = choice.lower()
+    if lower_choice in SUPPORTED_COOKIE_BROWSERS:
+        browser = SUPPORTED_COOKIE_BROWSERS[lower_choice]
+        print(f"Using cookies from {browser}. Close the browser first if cookie loading fails.")
+        return {"cookiesfrombrowser": (browser,)}
+
+    cookie_path = Path(choice).expanduser()
+    if cookie_path.exists():
+        print(f"Using cookies file: {cookie_path}")
+        return {"cookiefile": str(cookie_path)}
+
+    print("Cookie source not found or not supported. Continuing without cookies.")
+    return {}
+
+
+def get_info(url: str, cookie_opts: dict) -> dict:
+    ydl_opts = BASE_YDL_OPTS | {
         "quiet": True,
         "skip_download": True,
         "no_warnings": True,
         "noplaylist": True,
     }
+    ydl_opts.update(cookie_opts)
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -95,18 +131,19 @@ def progress_hook(d: dict) -> None:
             print("Download finished.")
 
 
-def download(url: str, mode: str) -> None:
+def download(url: str, mode: str, cookie_opts: dict) -> None:
     VIDEO_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     ffmpeg_path = resolve_ffmpeg()
 
     if mode == "audio":
-        ydl_opts = {
+        ydl_opts = BASE_YDL_OPTS | {
             "outtmpl": str(AUDIO_DIR / "%(title).200s.%(ext)s"),
             "format": "bestaudio/best",
             "noplaylist": True,
             "progress_hooks": [progress_hook],
         }
+        ydl_opts.update(cookie_opts)
         if ffmpeg_path:
             ydl_opts["ffmpeg_location"] = ffmpeg_path
             ydl_opts["postprocessors"] = [
@@ -126,16 +163,17 @@ def download(url: str, mode: str) -> None:
             ydl.download([url])
         return
 
-    info = get_info(url)
+    info = get_info(url, cookie_opts)
     heights = available_heights(info)
     format_selector = choose_format(heights)
-    ydl_opts = {
+    ydl_opts = BASE_YDL_OPTS | {
         "outtmpl": str(VIDEO_DIR / "%(title).200s.%(ext)s"),
         "format": format_selector,
         "merge_output_format": "mp4",
         "noplaylist": True,
         "progress_hooks": [progress_hook],
     }
+    ydl_opts.update(cookie_opts)
     if ffmpeg_path:
         ydl_opts["ffmpeg_location"] = ffmpeg_path
         print(f"Using ffmpeg: {ffmpeg_path}")
@@ -148,6 +186,7 @@ def download(url: str, mode: str) -> None:
 
 def main() -> int:
     mode = choose_mode()
+    cookie_opts = choose_cookie_options()
 
     try:
         url = input("Paste YouTube URL: ").strip()
@@ -161,12 +200,14 @@ def main() -> int:
         return 1
 
     try:
-        download(url, mode)
+        download(url, mode, cookie_opts)
     except yt_dlp.utils.DownloadError as exc:
         msg = str(exc)
         print(f"Download failed: {msg}")
         if "ffmpeg is not installed" in msg.lower():
             print("Hint: set FFMPEG_PATH to your ffmpeg.exe path or add ffmpeg to PATH.")
+        if "sign in to confirm" in msg.lower() or "not a bot" in msg.lower():
+            print("Hint: run again and enter your signed-in browser name, e.g. chrome, edge, or firefox.")
         return 1
 
     return 0

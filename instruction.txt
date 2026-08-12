@@ -1,6 +1,8 @@
 ﻿Запуск:
 .venv\Scripts\activate
 python youtube_downloader.py
+Если YouTube просит подтвердить, что вы не бот, в поле Cookies введите браузер,
+где вы вошли в YouTube: chrome, edge, firefox или brave.
 python video_to_mp3.py
 python audio_to_text.py
 

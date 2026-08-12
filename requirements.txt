@@ -1,2 +1,2 @@
-yt-dlp
+yt-dlp[default]>=2026.8.4.234419.dev0
 faster-whisper
